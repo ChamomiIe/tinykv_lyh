@@ -48,6 +48,8 @@ const (
 )
 
 func InitRaftLocalState(raftEngine *badger.DB, region *metapb.Region) (*rspb.RaftLocalState, error) {
+	// 用regionid对应的key去数据库中找value并写到raftState中
+	// 如果没有找到，说明是新region，初始化raftState
 	raftState, err := GetRaftLocalState(raftEngine, region.Id)
 	if err != nil && err != badger.ErrKeyNotFound {
 		return nil, err

@@ -61,6 +61,7 @@ func NewPeerStorage(engines *engine_util.Engines, region *metapb.Region, regionS
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("raftState:%s applyState: %v", raftState.String(), applyState)
 	if raftState.LastIndex < applyState.AppliedIndex {
 		panic(fmt.Sprintf("%s unexpected raft log index: lastIndex %d < appliedIndex %d",
 			tag, raftState.LastIndex, applyState.AppliedIndex))
@@ -308,6 +309,40 @@ func ClearMeta(engines *engine_util.Engines, kvWB, raftWB *engine_util.WriteBatc
 // never be committed
 func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.WriteBatch) error {
 	// Your Code Here (2B).
+	if len(entries) == 0 {
+	}
+
+	// ps.Engines.Raft.Update(func(txn *badger.Txn) error {
+	for _, entry := range entries {
+		index := entry.Index
+		if index <= ps.raftState.LastIndex {
+			//删掉index小于等于lastIndex的entry
+			// raftlogkey1 := meta.RaftLogKey(ps.region.Id, index)
+			// raftlogkey2 := meta.RaftLogKey(ps.region.Id, ps.raftState.LastIndex)
+			ps.raftState.LastIndex = index - 1
+			//循环
+			for i := index; i <= ps.raftState.LastIndex; i++ {
+				raftWB.DeleteMeta(meta.RaftLogKey(ps.region.Id, i))
+			}
+			// if err := engine_util.DeleteRange(ps.Engines.Raft, raftlogkey1, raftlogkey2); err != nil {
+			// 	return err
+			// }
+		}
+		// 在raftwb中写入entry
+		raftlogkey := meta.RaftLogKey(ps.region.Id, index)
+		raftWB.SetMeta(raftlogkey, &entry)
+		// if err := engine_util.PutMeta(ps.Engines.Raft, raftlogkey, &entry); err != nil {
+		// 	return err
+		// }
+		ps.raftState.LastIndex++
+		ps.raftState.LastTerm = entry.Term
+	}
+	// })
+	if ps.raftState.HardState.Term < ps.raftState.LastTerm {
+		ps.raftState.HardState.Term = ps.raftState.LastTerm
+	}
+	raftWB.SetMeta(meta.RaftStateKey(ps.region.Id), ps.raftState)
+	raftWB.WriteToDB(ps.Engines.Raft)
 	return nil
 }
 
@@ -331,7 +366,16 @@ func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_ut
 func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, error) {
 	// Hint: you may call `Append()` and `ApplySnapshot()` in this function
 	// Your Code Here (2B/2C).
-	return nil, nil
+	// ps.raftState.HardState.Commit = ps.raftState.LastIndex
+	// if ps.raftState.HardState.Term < ps.raftState.LastTerm {
+	// 	ps.raftState.HardState.Term = ps.raftState.LastTerm
+	// }
+	// engine_util.PutMeta(ps.Engines.Raft, meta.RaftStateKey(ps.region.Id), ps.raftState)
+	wbkv := new(engine_util.WriteBatch)
+	wbraft := new(engine_util.WriteBatch)
+	ps.Append(ready.Entries, wbraft)
+	applySnapResult, err := ps.ApplySnapshot(&ready.Snapshot, wbkv, wbraft)
+	return applySnapResult, err
 }
 
 func (ps *PeerStorage) ClearData() {

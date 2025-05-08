@@ -46,6 +46,7 @@ func (rw *raftWorker) run(closeCh <-chan struct{}, wg *sync.WaitGroup) {
 			msgs = append(msgs, <-rw.raftCh)
 		}
 		peerStateMap := make(map[uint64]*peerState)
+		// 将msg中regionID对应的peerState放入peerStateMap中，并取出peerstate
 		for _, msg := range msgs {
 			peerState := rw.getPeerState(peerStateMap, msg.RegionID)
 			if peerState == nil {

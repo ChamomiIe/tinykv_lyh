@@ -104,8 +104,8 @@ type Transport interface {
 	Send(msg *rspb.RaftMessage) error
 }
 
-/// loadPeers loads peers in this store. It scans the db engine, loads all regions and their peers from it
-/// WARN: This store should not be used before initialized.
+// / loadPeers loads peers in this store. It scans the db engine, loads all regions and their peers from it
+// / WARN: This store should not be used before initialized.
 func (bs *Raftstore) loadPeers() ([]*peer, error) {
 	// Scan region meta to get saved regions.
 	startKey := meta.RegionMetaMinKey
@@ -249,6 +249,8 @@ func (bs *Raftstore) start(
 		schedulerClient:      schedulerClient,
 		tickDriverSender:     bs.tickDriver.newRegionCh,
 	}
+	// 从数据库引擎中加载存储节点上的所有region及其对应的peer信息。
+	// 该方法会扫描数据库中存储区域元数据的范围，解析出区域的本地状态，根据状态处理正常区域和Tombstone区域，并为正常区域创建对应的peer实例。
 	regionPeers, err := bs.loadPeers()
 	if err != nil {
 		return err

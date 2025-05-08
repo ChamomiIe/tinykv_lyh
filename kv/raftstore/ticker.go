@@ -101,6 +101,7 @@ func (r *tickDriver) run() {
 	for {
 		select {
 		case <-timer:
+			// log.DIYf("tick", "TICKER TICK")
 			for regionID := range r.regions {
 				if r.router.send(regionID, message.NewPeerMsg(message.MsgTypeTick, regionID, nil)) != nil {
 					delete(r.regions, regionID)
@@ -111,6 +112,7 @@ func (r *tickDriver) run() {
 			if !ok {
 				return
 			}
+			// log.DIYf("tick", "ticker recieve new region %d", regionID)
 			r.regions[regionID] = struct{}{}
 		}
 	}

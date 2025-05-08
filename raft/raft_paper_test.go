@@ -895,7 +895,6 @@ func commitNoopEntry(r *Raft, s *MemoryStorage) {
 		if id == r.id {
 			continue
 		}
-
 		r.sendAppend(id)
 	}
 	// simulate the response of MessageType_MsgAppend

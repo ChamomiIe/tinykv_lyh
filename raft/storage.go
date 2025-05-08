@@ -46,15 +46,18 @@ var ErrSnapshotTemporarilyUnavailable = errors.New("snapshot is temporarily unav
 // application is responsible for cleanup and recovery in this case.
 type Storage interface {
 	// InitialState returns the saved HardState and ConfState information.
+	// 返回hardstate包含当前任期，投票信息；cofstate包含当前集群成员信息
 	InitialState() (pb.HardState, pb.ConfState, error)
 	// Entries returns a slice of log entries in the range [lo,hi).
 	// MaxSize limits the total size of the log entries returned, but
 	// Entries returns at least one entry if any.
+	// 返回指定范围内的日志条目
 	Entries(lo, hi uint64) ([]pb.Entry, error)
 	// Term returns the term of entry i, which must be in the range
 	// [FirstIndex()-1, LastIndex()]. The term of the entry before
 	// FirstIndex is retained for matching purposes even though the
 	// rest of that entry may not be available.
+	// 返回指定索引的日志条目的任期
 	Term(i uint64) (uint64, error)
 	// LastIndex returns the index of the last entry in the log.
 	LastIndex() (uint64, error)
@@ -62,11 +65,16 @@ type Storage interface {
 	// possibly available via Entries (older entries have been incorporated
 	// into the latest Snapshot; if storage only contains the dummy entry the
 	// first log entry is not available).
+	// FirstIndex 方法返回首个可能通过 Entries 方法获取到的日志条目的索引
+	// （较早的条目已被合并到最新的快照中；如果存储中仅包含虚拟条目，则首个日志条目不可用）。
 	FirstIndex() (uint64, error)
 	// Snapshot returns the most recent snapshot.
 	// If snapshot is temporarily unavailable, it should return ErrSnapshotTemporarilyUnavailable,
 	// so raft state machine could know that Storage needs some time to prepare
 	// snapshot and call Snapshot later.
+	// Snapshot 方法用于返回最新的快照。
+	// 如果快照暂时不可用，该方法应返回 ErrSnapshotTemporarilyUnavailable 错误，
+	// 这样 Raft 状态机就能知晓存储模块需要一些时间来准备快照，并在之后再次调用 Snapshot 方法。
 	Snapshot() (pb.Snapshot, error)
 }
 
@@ -84,6 +92,7 @@ type MemoryStorage struct {
 	ents []pb.Entry
 }
 
+// 开始就有一个dummy entry在entries[0], 返回的firstIndex是entries[0].Index+1
 // NewMemoryStorage creates an empty MemoryStorage.
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{

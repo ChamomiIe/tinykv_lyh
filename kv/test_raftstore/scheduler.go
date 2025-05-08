@@ -184,6 +184,7 @@ func (m *MockSchedulerClient) GetStore(ctx context.Context, storeID uint64) (*me
 
 func (m *MockSchedulerClient) GetRegion(ctx context.Context, key []byte) (*metapb.Region, *metapb.Peer, error) {
 	if err := m.checkBootstrap(); err != nil {
+		log.Debugf("check bootstrap failed, err: %v", err)
 		return nil, nil, err
 	}
 	m.RLock()

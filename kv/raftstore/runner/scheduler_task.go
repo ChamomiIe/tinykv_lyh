@@ -62,6 +62,7 @@ func (r *SchedulerTaskHandler) Handle(t worker.Task) {
 }
 
 func (r *SchedulerTaskHandler) Start() {
+	// 设置store中heartbeatResponseHandler为onRegionHeartbeatResponse
 	r.SchedulerClient.SetRegionHeartbeatResponseHandler(r.storeID, r.onRegionHeartbeatResponse)
 }
 

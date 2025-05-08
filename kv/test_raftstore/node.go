@@ -147,11 +147,12 @@ func NewNodeSimulator(schedulerClient scheduler_client.Client) *NodeSimulator {
 func (c *NodeSimulator) RunStore(cfg *config.Config, engine *engine_util.Engines, ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
-
+	// 创建router和raftstore（包含tickdriver）
 	raftRouter, raftSystem := raftstore.CreateRaftstore(cfg)
 	snapManager := snap.NewSnapManager(cfg.DBPath + "/snap")
+	// 创建newnode，传入raftstore和schedulerClient
 	node := raftstore.NewNode(raftSystem, cfg, c.schedulerClient)
-
+	// 调用raftstore的start方法
 	err := node.Start(ctx, engine, c.trans, snapManager)
 	if err != nil {
 		return err
@@ -206,7 +207,7 @@ func (c *NodeSimulator) CallCommandOnStore(storeID uint64, request *raft_cmdpb.R
 		log.Fatalf("Can not find node %d", storeID)
 	}
 	c.RUnlock()
-
+	log.DIYf("req", "CallCommandOnStore %d, request %s", storeID, request.String())
 	cb := message.NewCallback()
 	err := router.SendRaftCommand(request, cb)
 	if err != nil {

@@ -56,7 +56,7 @@ func NewCluster(count int, schedulerClient *MockSchedulerClient, simulator Simul
 func (c *Cluster) Start() {
 	ctx := context.TODO()
 	clusterID := c.schedulerClient.GetClusterID(ctx)
-
+	// 对每个storeid创建dbpath和engine，并保存
 	for storeID := uint64(1); storeID <= uint64(c.count); storeID++ {
 		dbPath, err := ioutil.TempDir("", c.baseDir)
 		if err != nil {
@@ -97,16 +97,17 @@ func (c *Cluster) Start() {
 		EndKey:      []byte{},
 		RegionEpoch: regionEpoch,
 	}
-
+	// 为每个storeID创建一个peermeta并添加到firstRegion的peers中
 	for storeID, engine := range c.engines {
 		peer := NewPeer(storeID, storeID)
 		firstRegion.Peers = append(firstRegion.Peers, peer)
+		// 检查 kv 存储和 raft 存储是否为空，如果都为空，则将存储标识（StoreIdent）信息存入 kv 存储中。
 		err := raftstore.BootstrapStore(engine, clusterID, storeID)
 		if err != nil {
 			panic(err)
 		}
 	}
-
+	// 将初始化状态的kv写入raftdb和kvdb
 	for _, engine := range c.engines {
 		raftstore.PrepareBootstrapCluster(engine, firstRegion)
 	}
@@ -115,6 +116,7 @@ func (c *Cluster) Start() {
 		Id:      1,
 		Address: "",
 	}
+	// 检查集群是否已经被引导过，如果没有，则将传入的存储信息添加到 schedulerClient.stores中，并标记集群已被引导
 	resp, err := c.schedulerClient.Bootstrap(context.TODO(), store)
 	if err != nil {
 		panic(err)
@@ -128,13 +130,16 @@ func (c *Cluster) Start() {
 			Id:      storeID,
 			Address: "",
 		}
+		// 对每个store，将存储信息添加到 schedulerClient.stores中
 		err := c.schedulerClient.PutStore(context.TODO(), store)
 		if err != nil {
 			panic(err)
 		}
+		// 删除PrepareBootstrapKey
 		raftstore.ClearPrepareBootstrapState(engine)
 	}
-
+	// 启动一个存储节点，它会完成一系列初始化操作，
+	// 包括创建 Raft 存储系统、快照管理器、节点实例，启动节点并将其注册到 NodeSimulator 中，最后将存储节点添加到传输层中。
 	for storeID := range c.engines {
 		c.StartServer(storeID)
 	}
@@ -221,6 +226,7 @@ func (c *Cluster) CallCommandOnLeader(request *raft_cmdpb.RaftCmdRequest, timeou
 			panic(fmt.Sprintf("can't get leader of region %d", regionID))
 		}
 		request.Header.Peer = leader
+		log.DIYf("msg", "call command on leader %v of region %d", leader, regionID)
 		resp, txn := c.CallCommand(request, 1*time.Second)
 		if resp == nil {
 			log.Debugf("can't call command %s on leader %d of region %d", request.String(), leader.GetId(), regionID)
